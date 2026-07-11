@@ -14,19 +14,30 @@
         "x86_64-linux"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
+      pkgsFor = system: import nixpkgs {
+        inherit system;
+        config.allowUnfree = true;
+      };
     in
     {
       packages = forAllSystems (system:
         let
-          pkgs = import nixpkgs {
-            inherit system;
-            config.allowUnfree = true;
-          };
+          pkgs = pkgsFor system;
           codex = pkgs.callPackage ./pkgs/codex/package.nix { };
         in
         {
           inherit codex;
           default = codex;
+        });
+
+      devShells = forAllSystems (system:
+        let
+          pkgs = pkgsFor system;
+        in
+        {
+          default = pkgs.mkShellNoCC {
+            packages = [ pkgs.nix-update ];
+          };
         });
     };
 }

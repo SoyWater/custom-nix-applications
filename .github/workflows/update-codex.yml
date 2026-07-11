@@ -1,0 +1,58 @@
+name: Update Codex
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-codex
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Configure Cachix
+        uses: cachix/cachix-action@v17
+        with:
+          name: custom-nix-applications
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: Update Codex package
+        id: update
+        run: |
+          nix develop -c nix-update \
+            --flake codex \
+            --use-github-releases \
+            --version-regex '^rust-v(\d+\.\d+\.\d+)$'
+
+          if git diff --quiet -- pkgs/codex/package.nix; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Codex
+        run: nix build .#codex --max-jobs 1 --cores 1 --print-build-logs
+
+      - name: Commit verified update
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          version="$(nix eval --raw .#codex.version)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pkgs/codex/package.nix
+          git commit -m "codex: update to $version"
+          git push origin HEAD:main
