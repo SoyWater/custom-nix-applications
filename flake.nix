@@ -14,20 +14,25 @@
         "x86_64-linux"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
+      codexOverlay = final: _prev: {
+        codex = final.callPackage ./pkgs/codex/package.nix { };
+      };
       pkgsFor = system: import nixpkgs {
         inherit system;
         config.allowUnfree = true;
+        overlays = [ codexOverlay ];
       };
     in
     {
+      overlays.default = codexOverlay;
+
       packages = forAllSystems (system:
         let
           pkgs = pkgsFor system;
-          codex = pkgs.callPackage ./pkgs/codex/package.nix { };
         in
         {
-          inherit codex;
-          default = codex;
+          inherit (pkgs) codex;
+          default = pkgs.codex;
         });
 
       devShells = forAllSystems (system:
