@@ -50,8 +50,12 @@ rustPlatform.buildRustPackage (finalAttrs: {
     # but nixpkgs provides libwebrtc as a shared library.
     # use LK_CUSTOM_WEBRTC to point to the packaged library and adjust linking
     # to use the shared library instead
-    substituteInPlace $cargoDepsCopy/*/webrtc-sys-*/build.rs \
-      --replace-fail "cargo:rustc-link-lib=static=webrtc" "cargo:rustc-link-lib=dylib=webrtc"
+    for webrtcBuildRs in $cargoDepsCopy/*/webrtc-sys-*/build.rs; do
+      if [ -f "$webrtcBuildRs" ]; then
+        substituteInPlace "$webrtcBuildRs" \
+          --replace-fail "cargo:rustc-link-lib=static=webrtc" "cargo:rustc-link-lib=dylib=webrtc"
+      fi
+    done
 
     substituteInPlace Cargo.toml \
       --replace-fail 'lto = "thin"' "" \
